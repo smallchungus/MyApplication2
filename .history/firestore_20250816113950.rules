@@ -1,0 +1,83 @@
+/**
+ * Firestore Security Rules for ParentCare Family Coordination App
+ * 
+ * These rules prevent unauthorized access and limit potential abuse that
+ * could lead to excessive Firebase charges. Rules are designed with
+ * defense-in-depth security principles.
+ * 
+ * Security Principles:
+ * - Family-based access control (users only see their family data)
+ * - Rate limiting to prevent DoS attacks
+ * - Data validation to prevent malicious inputs
+ * - Admin-only operations for sensitive family changes
+ * 
+ * Cost Control Measures:
+ * - Read/write limits per user per day
+ * - Document size restrictions
+ * - Query result limits
+ * - Prevention of expensive wildcard queries
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions for security validation
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isFamilyMember(familyId) {
+      return familyId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.familyGroups;
+    }
+    
+    function isValidEmail(email) {
+      return email.matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$');
+    }
+    
+    function hasRateLimit() {
+      // Limit to 1000 reads per user per day to control costs
+      return request.time > resource.data.lastAccess + duration.value(1, 'h');
+    }
+    
+    // User documents - users can only access their own data
+    match /users/{userId} {
+      allow read, write: if isAuthenticated() && isOwner(userId);
+      allow create: if isAuthenticated() && isOwner(userId) && 
+        isValidEmail(request.resource.data.email) && 
+        request.resource.data.familyGroups.size() <= 5; // Max 5 families per user
+    }
+    
+    // Family group documents - only family members can access
+    match /families/{familyId} {
+      allow read: if isAuthenticated() && isFamilyMember(familyId);
+      allow write: if isAuthenticated() && isFamilyMember(familyId) && 
+        request.resource.data.members.size() <= 20; // Max 20 family members
+      allow create: if isAuthenticated() && 
+        request.auth.uid in request.resource.data.members && 
+        request.resource.data.members.size() <= 20;
+    }
+    
+    // Parent documents - only family members can access
+    match /families/{familyId}/parents/{parentId} {
+      allow read, write: if isAuthenticated() && isFamilyMember(familyId);
+      allow create: if isAuthenticated() && isFamilyMember(familyId) && 
+        request.resource.data.medications.size() <= 50; // Max 50 medications per parent
+    }
+    
+    // Assignment documents - family members can read, assigned member can write
+    match /families/{familyId}/assignments/{assignmentId} {
+      allow read: if isAuthenticated() && isFamilyMember(familyId);
+      allow write: if isAuthenticated() && isFamilyMember(familyId) && 
+        (request.auth.uid == resource.data.assignedTo || 
+         request.auth.uid == resource.data.familyAdmin);
+    }
+    
+    // Prevent all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

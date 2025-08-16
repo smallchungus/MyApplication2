@@ -6,6 +6,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import org.junit.Rule
 import org.junit.Test
 import org.junit.Assert.*
@@ -173,9 +174,9 @@ class TodayScreenTest {
         composeTestRule.onNodeWithText("Take Now").assertDoesNotExist()
         composeTestRule.onNodeWithText("Taken ✓").assertIsDisplayed()
         
-        // Verify that no Take buttons exist for taken medications
+        // Verify that remaining Take buttons exist for untaken medications
         val takeButtons = composeTestRule.onAllNodesWithText("Take Now")
-        assertEquals("No Take buttons should exist after medication is taken", 2, takeButtons.fetchSemanticsNodes().size)
+        assertEquals("Should have 2 remaining Take buttons", 2, takeButtons.fetchSemanticsNodes().size)
     }
     
     /**
