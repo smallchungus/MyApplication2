@@ -137,14 +137,6 @@ class ParentCareNavigationCoordinator @Inject constructor() : ViewModel() {
     fun navigateBack() {
         onNavigationEvent(NavigationEvent.NavigateBack)
     }
-    
-    /**
-     * Handles user logout and returns to login screen.
-     */
-    fun logout() {
-        onNavigationEvent(NavigationEvent.NavigateToLogin)
-        _currentDestination.value = ParentCareDestination.Auth.Login
-    }
 }
 
 /**
@@ -170,12 +162,7 @@ fun ParentCareNavigationHost(
                 }
                 NavigationEvent.NavigateToFamilyDashboard -> {
                     navController.navigate(ParentCareDestination.Main.Dashboard.route) {
-                        popUpTo(ParentCareDestination.Auth.Login.route) { inclusive = true }
-                    }
-                }
-                NavigationEvent.NavigateToLogin -> {
-                    navController.navigate(ParentCareDestination.Auth.Login.route) {
-                        popUpTo(0) { inclusive = true }
+                        popUpTo(ParentCareDestination.Auth.Welcome.route) { inclusive = true }
                     }
                 }
                 NavigationEvent.NavigateToEmergencyInfo -> {
@@ -213,15 +200,15 @@ fun ParentCareNavigationHost(
         
         composable(ParentCareDestination.Auth.Login.route) {
             LoginScreen(
-                onLoginSuccess = { coordinator.navigateToFamilyDashboard() },
-                onCreateAccount = { coordinator.navigateToCreateAccount() }
+                onLoginSuccess = { coordinator.navigateToFamilySetup() },
+                onBack = { coordinator.navigateBack() }
             )
         }
         
         composable(ParentCareDestination.Auth.FamilySetup.route) {
             FamilySetupScreen(
                 onSetupComplete = { coordinator.navigateToFamilyDashboard() },
-                onSkip = { coordinator.navigateToFamilyDashboard() }
+                onBack = { coordinator.navigateBack() }
             )
         }
         
@@ -229,8 +216,7 @@ fun ParentCareNavigationHost(
         composable(ParentCareDestination.Main.Dashboard.route) {
             FamilyDashboardScreen(
                 onNavigateToEmergency = { coordinator.navigateToEmergencyInfo() },
-                onNavigateToReports = { coordinator.navigateToReports() },
-                onLogout = { coordinator.logout() }
+                onNavigateToReports = { coordinator.navigateToReports() }
             )
         }
         
@@ -459,33 +445,24 @@ private fun LoginScreen(
 }
 
 /**
- * Family setup screen for new user onboarding.
- * 
- * Collects essential family information for new accounts and provides
- * options to complete setup or skip for later configuration.
- * 
- * Design Decisions:
- * - Minimal required fields to reduce friction
- * - Skip option for users who want to explore first
- * - Clear progress indication for multi-step setup
- * - Validation to ensure meaningful family names
- * 
- * @param onSetupComplete Callback when user completes full setup
- * @param onSkip Callback when user chooses to skip setup
+ * Family setup screen for onboarding.
  */
 @Composable
 private fun FamilySetupScreen(
     onSetupComplete: () -> Unit,
-    onSkip: () -> Unit
+    onBack: () -> Unit
 ) {
     var familyName by remember { mutableStateOf("") }
-    var seniorName by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(false) }
     
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Setup Your Family") }
+                title = { Text("Family Setup") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
             )
         }
     ) { paddingValues ->
@@ -497,121 +474,42 @@ private fun FamilySetupScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.Group,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = MaterialTheme.colorScheme.primary
+            Text(
+                text = "Set up your family",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
             )
             
             Spacer(modifier = Modifier.height(24.dp))
-            
-            Text(
-                text = "Welcome to ParentCare",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Text(
-                text = "Let's set up your family care network",
-                style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            
-            Spacer(modifier = Modifier.height(32.dp))
             
             OutlinedTextField(
                 value = familyName,
                 onValueChange = { familyName = it },
                 label = { Text("Family Name") },
-                placeholder = { Text("The Smith Family") },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !isLoading
+                modifier = Modifier.fillMaxWidth()
             )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            OutlinedTextField(
-                value = seniorName,
-                onValueChange = { seniorName = it },
-                label = { Text("Senior's Name") },
-                placeholder = { Text("Who needs medication help?") },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !isLoading
-            )
-            
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            // Complete Setup Button
-            Button(
-                onClick = {
-                    if (familyName.isNotBlank() && seniorName.isNotBlank()) {
-                        isLoading = true
-                        onSetupComplete()
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                enabled = !isLoading && familyName.isNotBlank() && seniorName.isNotBlank()
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                } else {
-                    Text("Complete Setup")
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Skip for Now Button
-            TextButton(
-                onClick = onSkip,
-                enabled = !isLoading
-            ) {
-                Text("Skip for Now")
-            }
             
             Spacer(modifier = Modifier.height(24.dp))
             
-            Text(
-                text = "You can always update this information later in settings",
-                style = MaterialTheme.typography.bodySmall,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Button(
+                onClick = onSetupComplete,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+            ) {
+                Text("Complete Setup")
+            }
         }
     }
 }
 
 /**
- * Emergency information screen with comprehensive emergency data.
- * 
- * Displays critical emergency contacts, current medications, 
- * medical conditions, and provides sharing functionality for
- * first responders and family members.
- * 
- * Design Decisions:
- * - Critical information prominently displayed
- * - Share button for emergency situations
- * - Clear, readable layout for stress situations
- * - Quick access to essential medical data
- * 
- * @param onBack Callback for back navigation
+ * Emergency information screen.
  */
 @Composable
 private fun EmergencyInfoScreen(
     onBack: () -> Unit
 ) {
-    var showShareDialog by remember { mutableStateOf(false) }
-    
     Scaffold(
         topBar = {
             TopAppBar(
@@ -620,21 +518,7 @@ private fun EmergencyInfoScreen(
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
-                },
-                actions = {
-                    IconButton(onClick = { showShareDialog = true }) {
-                        Icon(
-                            Icons.Default.Share,
-                            contentDescription = "Share Emergency Info",
-                            tint = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                    titleContentColor = MaterialTheme.colorScheme.onError,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onError
-                )
+                }
             )
         }
     ) { paddingValues ->
@@ -642,117 +526,8 @@ private fun EmergencyInfoScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(16.dp)
         ) {
-            // Emergency Contacts Card
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.Emergency,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Emergency Contacts",
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onErrorContainer
-                            )
-                        }
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        EmergencyContactItem("911", "Emergency Services")
-                        EmergencyContactItem("(555) 123-4567", "Dr. Smith - Primary Care")
-                        EmergencyContactItem("(555) 987-6543", "Main Pharmacy")
-                        EmergencyContactItem("(555) 555-0123", "Sarah (Daughter)")
-                        EmergencyContactItem("(555) 555-0124", "Mike (Son)")
-                    }
-                }
-            }
-            
-            // Current Medications Card
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.MedicalServices,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Current Medications",
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        MedicationItem("Lisinopril 10mg", "Once daily, morning")
-                        MedicationItem("Aspirin 81mg", "Once daily with food")
-                        MedicationItem("Vitamin D 1000 IU", "Once daily, evening")
-                        MedicationItem("Metformin 500mg", "Twice daily with meals")
-                    }
-                }
-            }
-            
-            // Medical Conditions Card
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Default.HealthAndSafety,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Medical Conditions",
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        Text("• Hypertension")
-                        Text("• Type 2 Diabetes")
-                        Text("• Arthritis")
-                        Text("• No known drug allergies")
-                    }
-                }
-            }
-            
-            // Insurance Information Card
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth()
@@ -761,93 +536,20 @@ private fun EmergencyInfoScreen(
                         modifier = Modifier.padding(16.dp)
                     ) {
                         Text(
-                            text = "Insurance Information",
+                            text = "Emergency Contacts",
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold
                         )
                         
                         Spacer(modifier = Modifier.height(16.dp))
                         
-                        Text("Provider: Medicare + AARP Supplement")
-                        Text("Policy #: 123-45-6789A")
-                        Text("Group #: SUPP2024")
+                        Text("Doctor: Dr. Smith - (555) 123-4567")
+                        Text("Pharmacy: Main Pharmacy - (555) 987-6543")
+                        Text("Emergency: 911")
                     }
                 }
             }
         }
-        
-        // Share Dialog
-        if (showShareDialog) {
-            AlertDialog(
-                onDismissRequest = { showShareDialog = false },
-                title = { Text("Share Emergency Info") },
-                text = { Text("This will share emergency contact and medical information. Continue?") },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            showShareDialog = false
-                            // TODO: Implement actual sharing functionality
-                        }
-                    ) {
-                        Text("Share")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showShareDialog = false }) {
-                        Text("Cancel")
-                    }
-                }
-            )
-        }
-    }
-}
-
-/**
- * Emergency contact list item.
- */
-@Composable
-private fun EmergencyContactItem(phone: String, name: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = name,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium
-        )
-        Text(
-            text = phone,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-    }
-}
-
-/**
- * Medication list item.
- */
-@Composable
-private fun MedicationItem(medication: String, instructions: String) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-    ) {
-        Text(
-            text = medication,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            text = instructions,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }
 

@@ -14,14 +14,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -107,18 +105,8 @@ fun FamilyDashboardScreen(
         topBar = { 
             TopAppBar(
                 title = { Text("Family Care Dashboard") },
-                actions = {
-                    IconButton(onClick = onLogout) {
-                        Icon(
-                            Icons.Default.Logout,
-                            contentDescription = "Logout",
-                            tint = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
-                },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = MaterialTheme.colorScheme.primary
                 ),
                 modifier = Modifier.testTag("family_dashboard_top_bar")
             )

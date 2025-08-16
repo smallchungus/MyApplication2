@@ -256,16 +256,3 @@ fun ErrorRecoveryScreen(
         )
     }
 }
-
-/**
- * Main parent care app with navigation flow starting from login.
- * 
- * Implements complete navigation architecture with authentication-aware routing.
- * Starts with login screen and manages user flow through the app.
- * 
- * @since 1.0.0
- */
-@Composable
-fun ParentCareApp() {
-    ParentCareNavigationHost()
-}

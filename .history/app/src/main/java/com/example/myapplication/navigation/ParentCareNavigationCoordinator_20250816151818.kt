@@ -1,0 +1,563 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
+package com.example.myapplication.navigation
+
+import android.util.Log
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.example.myapplication.FamilyDashboardScreen
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+/**
+ * Navigation coordinator for ParentCare family coordination app.
+ * 
+ * Manages navigation flow between authentication, onboarding, and main app.
+ * Implements proper state management to prevent navigation inconsistencies
+ * and handles deep linking for family invitation scenarios.
+ * 
+ * Design Decisions:
+ * - Uses Compose Navigation for type-safe navigation
+ * - Maintains navigation state in ViewModel for configuration changes
+ * - Implements proper back stack management for UX consistency
+ * 
+ * @author ParentCare Navigation Team
+ * @since 1.0.0
+ */
+@HiltViewModel
+class ParentCareNavigationCoordinator @Inject constructor() : ViewModel() {
+    
+    // Navigation event flow for handling navigation actions
+    private val _navigationEvents = MutableSharedFlow<NavigationEvent>(extraBufferCapacity = 1)
+    val navigationEvents: SharedFlow<NavigationEvent> = _navigationEvents.asSharedFlow()
+    
+    // Current destination tracking
+    private val _currentDestination = MutableStateFlow<ParentCareDestination>(ParentCareDestination.Auth.Welcome)
+    val currentDestination: StateFlow<ParentCareDestination> = _currentDestination.asStateFlow()
+    
+    // Navigation loading state
+    private val _isNavigating = MutableStateFlow(false)
+    val isNavigating: StateFlow<Boolean> = _isNavigating.asStateFlow()
+    
+    /**
+     * Handles navigation events with proper error handling and logging.
+     * 
+     * @param event Navigation event to process
+     */
+    fun onNavigationEvent(event: NavigationEvent) {
+        viewModelScope.launch {
+            try {
+                _isNavigating.value = true
+                _navigationEvents.emit(event)
+                Log.d("Navigation", "Navigation event emitted: $event")
+            } catch (e: Exception) {
+                Log.e("Navigation", "Failed to emit navigation event", e)
+            } finally {
+                _isNavigating.value = false
+            }
+        }
+    }
+    
+    /**
+     * Navigates to login screen.
+     */
+    fun navigateToLogin() {
+        onNavigationEvent(NavigationEvent.NavigateToLogin)
+        _currentDestination.value = ParentCareDestination.Auth.Login
+    }
+    
+    /**
+     * Navigates to family setup.
+     */
+    fun navigateToFamilySetup() {
+        onNavigationEvent(NavigationEvent.NavigateToFamilySetup)
+        _currentDestination.value = ParentCareDestination.Auth.FamilySetup
+    }
+    
+    /**
+     * Navigates to family dashboard and clears back stack.
+     */
+    fun navigateToFamilyDashboard() {
+        onNavigationEvent(NavigationEvent.NavigateToFamilyDashboard)
+        _currentDestination.value = ParentCareDestination.Main.Dashboard
+    }
+    
+    /**
+     * Navigates to emergency info screen.
+     */
+    fun navigateToEmergencyInfo() {
+        onNavigationEvent(NavigationEvent.NavigateToEmergencyInfo)
+        _currentDestination.value = ParentCareDestination.Main.Emergency
+    }
+    
+    /**
+     * Navigates to reports screen.
+     */
+    fun navigateToReports() {
+        onNavigationEvent(NavigationEvent.NavigateToReports)
+        _currentDestination.value = ParentCareDestination.Main.Reports
+    }
+    
+    /**
+     * Navigates back in the navigation stack.
+     */
+    fun navigateBack() {
+        onNavigationEvent(NavigationEvent.NavigateBack)
+    }
+}
+
+/**
+ * Main navigation host for the ParentCare app.
+ * 
+ * @param navController Navigation controller
+ * @param coordinator Navigation coordinator
+ */
+@Composable
+fun ParentCareNavigationHost(
+    navController: NavHostController = rememberNavController(),
+    coordinator: ParentCareNavigationCoordinator = hiltViewModel()
+) {
+    // Handle navigation events
+    LaunchedEffect(coordinator) {
+        coordinator.navigationEvents.collect { event ->
+            when (event) {
+                NavigationEvent.NavigateToLogin -> {
+                    navController.navigate(ParentCareDestination.Auth.Login.route)
+                }
+                NavigationEvent.NavigateToFamilySetup -> {
+                    navController.navigate(ParentCareDestination.Auth.FamilySetup.route)
+                }
+                NavigationEvent.NavigateToFamilyDashboard -> {
+                    navController.navigate(ParentCareDestination.Main.Dashboard.route) {
+                        popUpTo(ParentCareDestination.Auth.Welcome.route) { inclusive = true }
+                    }
+                }
+                NavigationEvent.NavigateToEmergencyInfo -> {
+                    navController.navigate(ParentCareDestination.Main.Emergency.route)
+                }
+                NavigationEvent.NavigateToReports -> {
+                    navController.navigate(ParentCareDestination.Main.Reports.route)
+                }
+                NavigationEvent.NavigateToDevMode -> {
+                    navController.navigate(ParentCareDestination.System.DevMode.route)
+                }
+                NavigationEvent.NavigateBack -> {
+                    navController.popBackStack()
+                }
+                is NavigationEvent.NavigateTo -> {
+                    navController.navigate(event.destination.route)
+                }
+            }
+        }
+    }
+    
+    NavHost(
+        navController = navController,
+        startDestination = ParentCareDestination.Auth.Login.route
+    ) {
+        // Auth flow
+        composable(ParentCareDestination.Auth.Welcome.route) {
+            WelcomeScreen(
+                onContinue = { coordinator.navigateToLogin() },
+                onDevMode = { 
+                    coordinator.onNavigationEvent(NavigationEvent.NavigateToDevMode)
+                }
+            )
+        }
+        
+        composable(ParentCareDestination.Auth.Login.route) {
+            LoginScreen(
+                onLoginSuccess = { coordinator.navigateToFamilySetup() },
+                onBack = { coordinator.navigateBack() }
+            )
+        }
+        
+        composable(ParentCareDestination.Auth.FamilySetup.route) {
+            FamilySetupScreen(
+                onSetupComplete = { coordinator.navigateToFamilyDashboard() },
+                onBack = { coordinator.navigateBack() }
+            )
+        }
+        
+        // Main app flow
+        composable(ParentCareDestination.Main.Dashboard.route) {
+            FamilyDashboardScreen(
+                onNavigateToEmergency = { coordinator.navigateToEmergencyInfo() },
+                onNavigateToReports = { coordinator.navigateToReports() }
+            )
+        }
+        
+        composable(ParentCareDestination.Main.Emergency.route) {
+            EmergencyInfoScreen(
+                onBack = { coordinator.navigateBack() }
+            )
+        }
+        
+        composable(ParentCareDestination.Main.Reports.route) {
+            ReportsScreen(
+                onBack = { coordinator.navigateBack() }
+            )
+        }
+        
+        // System screens
+        composable(ParentCareDestination.System.DevMode.route) {
+            DevelopmentModeScreen(
+                onBack = { coordinator.navigateBack() }
+            )
+        }
+    }
+}
+
+/**
+ * Welcome screen with app introduction.
+ */
+@Composable
+private fun WelcomeScreen(
+    onContinue: () -> Unit,
+    onDevMode: () -> Unit
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("ParentCare") }
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Favorite,
+                contentDescription = null,
+                modifier = Modifier.size(80.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            Text(
+                text = "Welcome to ParentCare",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Text(
+                text = "Helping families coordinate senior care",
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            
+            Spacer(modifier = Modifier.height(48.dp))
+            
+            Button(
+                onClick = onContinue,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+            ) {
+                Text("Continue to App")
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            TextButton(onClick = onDevMode) {
+                Text("Development Mode")
+            }
+        }
+    }
+}
+
+/**
+ * Login screen for user authentication.
+ */
+@Composable
+private fun LoginScreen(
+    onLoginSuccess: () -> Unit,
+    onBack: () -> Unit
+) {
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Login") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            OutlinedTextField(
+                value = email,
+                onValueChange = { email = it },
+                label = { Text("Email") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("Password") },
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth()
+            )
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            Button(
+                onClick = onLoginSuccess,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+            ) {
+                Text("Login")
+            }
+        }
+    }
+}
+
+/**
+ * Family setup screen for onboarding.
+ */
+@Composable
+private fun FamilySetupScreen(
+    onSetupComplete: () -> Unit,
+    onBack: () -> Unit
+) {
+    var familyName by remember { mutableStateOf("") }
+    
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Family Setup") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "Set up your family",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
+            )
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            OutlinedTextField(
+                value = familyName,
+                onValueChange = { familyName = it },
+                label = { Text("Family Name") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            Button(
+                onClick = onSetupComplete,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+            ) {
+                Text("Complete Setup")
+            }
+        }
+    }
+}
+
+/**
+ * Emergency information screen.
+ */
+@Composable
+private fun EmergencyInfoScreen(
+    onBack: () -> Unit
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Emergency Info") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(16.dp)
+        ) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Emergency Contacts",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        Text("Doctor: Dr. Smith - (555) 123-4567")
+                        Text("Pharmacy: Main Pharmacy - (555) 987-6543")
+                        Text("Emergency: 911")
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Reports screen showing medication history.
+ */
+@Composable
+private fun ReportsScreen(
+    onBack: () -> Unit
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Weekly Report") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(16.dp)
+        ) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "This Week's Progress",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        Text("Medications taken: 12/14")
+                        Text("Missed doses: 2")
+                        Text("On-time rate: 85.7%")
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Development mode screen for testing.
+ */
+@Composable
+private fun DevelopmentModeScreen(
+    onBack: () -> Unit
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Development Mode") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "Development Mode",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
+            )
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            Text("This is development mode for testing UI components.")
+        }
+    }
+}

@@ -107,18 +107,8 @@ fun FamilyDashboardScreen(
         topBar = { 
             TopAppBar(
                 title = { Text("Family Care Dashboard") },
-                actions = {
-                    IconButton(onClick = onLogout) {
-                        Icon(
-                            Icons.Default.Logout,
-                            contentDescription = "Logout",
-                            tint = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
-                },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = MaterialTheme.colorScheme.primary
                 ),
                 modifier = Modifier.testTag("family_dashboard_top_bar")
             )
