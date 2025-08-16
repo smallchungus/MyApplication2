@@ -33,7 +33,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MedAppTheme {
-                TodayScreen()  // This displays the full medication interface!
+                TodayScreen()
             }
         }
     }
