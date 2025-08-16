@@ -48,6 +48,12 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+    // Enable Android resources for Robolectric Compose UI tests
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
 dependencies {
@@ -71,6 +77,14 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     
     testImplementation(libs.junit)
+    // Ensure Compose BOM also applies to unit test configuration
+    testImplementation(platform(libs.androidx.compose.bom))
+    // Add Compose UI test dependency for unit tests (Robolectric)
+    testImplementation(libs.androidx.ui.test.junit4)
+    // Manifest for host-side compose tests
+    testImplementation(libs.androidx.ui.test.manifest)
+    // Robolectric to run host-side Compose tests
+    testImplementation("org.robolectric:robolectric:4.11.1")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
